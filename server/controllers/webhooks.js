@@ -1,23 +1,23 @@
 import { Webhook } from "svix";
 import User from "../models/User.js";
 import Stripe from "stripe";
-import { response } from "express";
 import { Purchase } from "../models/Purchase.js"
 import Course from "../models/Course.js";
 
 // API Controller function to manage clerk user with database
-
 export const clerkWebhooks = async (req, res) => {
     try {
         const whook = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
 
-        await whook.verify(JSON.stringify(req.body), {
+        // req.body must be the RAW buffer here (see server.js route order below) —
+        // do NOT JSON.stringify it, svix needs the exact bytes Clerk signed.
+        whook.verify(req.body, {
             "svix-id": req.headers["svix-id"],
             "svix-timestamp": req.headers["svix-timestamp"],
             "svix-signature": req.headers["svix-signature"]
         });
 
-        const { data, type } = req.body;
+        const { data, type } = JSON.parse(req.body);
 
         switch (type) {
             case 'user.created': {
@@ -34,7 +34,7 @@ export const clerkWebhooks = async (req, res) => {
 
             case 'user.updated': {
                 const userData = {
-                    email: data.email_addresses[0].email_address,  // ✅ Fixed
+                    email: data.email_addresses[0].email_address,
                     name: data.first_name + " " + data.last_name,
                     imageUrl: data.image_url,
                 };
@@ -55,13 +55,14 @@ export const clerkWebhooks = async (req, res) => {
         }
 
     } catch (error) {
-        res.json({ success: false, message: error.message });
+        console.log('Clerk webhook error:', error.message);
+        res.status(400).json({ success: false, message: error.message });
     }
 };
 
 const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY)
 
-export const stripeWebhooks = async()=>{
+export const stripeWebhooks = async(request, response)=>{
     const sig = request.headers["stripe-signature"];
 
     let event;
@@ -69,12 +70,11 @@ export const stripeWebhooks = async()=>{
     try {
         event = stripeInstance.webhooks.constructEvent(request.body, sig, process.env.STRIPE_WEBHOOK_KEY);
     } catch (error) {
-        response.status(400).send(`Webhook Error: ${err.message}`);
+        return response.status(400).send(`Webhook Error: ${error.message}`);
     }
 
-    //handle the event
     switch (event.type) {
-        case 'payment_intent_succeeded':{
+        case 'payment_intent.succeeded':{
             const paymentIntent = event.data.object;
             const paymentIntentId = paymentIntent.id
 
@@ -88,7 +88,7 @@ export const stripeWebhooks = async()=>{
             const userData = await User.findById(purchaseData.userId)
             const courseData = await Course.findById(purchaseData.courseId.toString())
 
-            courseData.enrolledStudents.push(userData)
+            courseData.enrolledStudents.push(userData._id)
             await courseData.save()
 
             userData.enrolledCourses.push(courseData._id)
@@ -116,11 +116,9 @@ export const stripeWebhooks = async()=>{
          break; 
         }
 
-        //....handle other events types
         default:
             console.log(`unhandled event type ${event.type}`);
     }
 
-    //return a response o acknowledge receipt of the event
     response.json({received: true});
 }

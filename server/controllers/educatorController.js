@@ -6,7 +6,7 @@ import User from '../models/User.js';
 
 export const updateRoleToEducator = async (req, res) => {
     try {
-        const userId = req.auth.userId;
+        const userId = req.auth().userId;
 
         // This is the most common cause of the error
         if (!userId) {
@@ -43,7 +43,7 @@ export const addCourse = async (req, res)=>{
     try {
         const { courseData } = req.body
         const imageFile = req.file
-        const userId = req.auth.userId;
+        const userId = req.auth().userId;
 
         if(!imageFile){
             return res.json({ success: false, message: 'Thmbnail Not Attached'})
@@ -51,10 +51,11 @@ export const addCourse = async (req, res)=>{
 
         const parsedCourseData = await JSON.parse(courseData)
         parsedCourseData.educator = userId;
-        const newCourse = await Course.create(parsedCourseData)
+
         const imageUpload = await cloudinary.uploader.upload(imageFile.path)
-        newCourse.courseThumbnail = imageUpload.secure_url
-        await newCourse.save()
+        parsedCourseData.courseThumbnail = imageUpload.secure_url
+
+        const newCourse = await Course.create(parsedCourseData)
 
         res.json({success: true, message: 'Course Added'})
 
@@ -66,7 +67,7 @@ export const addCourse = async (req, res)=>{
 //Get Educator Courses
 export const getEducatorCourses = async (req, res)=>{
     try {
-        const userId = req.auth.userId;
+        const userId = req.auth().userId;
 
         const courses = await Course.find({educator: userId})
         res.json({success: true, courses})
@@ -81,7 +82,7 @@ export const getEducatorCourses = async (req, res)=>{
 
 export const educatorDashboardData = async (req, res)=>{
     try {
-        const educator = req.auth.userId;
+        const educator = req.auth().userId;
         const courses = await Course.find({educator});
         const totalCourses = courses.length;
 
@@ -121,7 +122,7 @@ export const educatorDashboardData = async (req, res)=>{
 //get enrolled students data with purchase data
 export const getEnrolledStudentsData = async (req, res)=>{
     try {
-        const educator = req.auth.userId;
+        const educator = req.auth().userId;
         const courses = await Course.find({educator});
         const courseIds = courses.map(course => course._id);
 

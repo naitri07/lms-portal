@@ -18,7 +18,14 @@ await connectCloudinary()
 
 // Middlewares
 app.use(cors());
-app.use(express.json());   // ← Move this up
+
+// Webhooks need the RAW body for signature verification — register these
+// BEFORE express.json() and don't let the JSON parser touch them.
+app.post('/clerk', express.raw({ type: 'application/json' }), clerkWebhooks);
+app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
+
+// Now the normal JSON parser for everything else
+app.use(express.json());
 
 // Clerk Middleware - Apply only to protected routes
 app.use('/api/educator', clerkMiddleware(), educatorRouter);
@@ -26,11 +33,8 @@ app.use('/api/educator', clerkMiddleware(), educatorRouter);
 // Public routes
 app.get('/', (req, res) => res.send("API Working"));
 
-// Clerk Webhook (MUST be public, no auth middleware)
-app.post('/clerk', clerkWebhooks);
 app.use('/api/course', clerkMiddleware(), courseRouter)
-app.use('/api/user',clerkMiddleware(), userRouter)
-app.post('/stripe',express.raw({type: 'application.json'}), stripeWebhooks)
+app.use('/api/user', clerkMiddleware(), userRouter)
 
 // PORT
 const PORT = process.env.PORT || 5000;

@@ -8,12 +8,15 @@ import { CourseProgress } from "../models/CourseProgress.js";
 //Get User Data
 export const getUserData = async (req, res)=>{
     try {
-        const userId = req.auth.userId
+        const userId = req.auth().userId
+        console.log('Looking up userId:', JSON.stringify(userId))
         const user = await User.findById(userId)
 
         if(!user){
             return res.json({ success: false, message: 'User Not Found'})
         }
+
+        res.json({ success: true, user })
     } catch (error) {
         res.json({ success: false, message: error.message})
     }
@@ -22,8 +25,12 @@ export const getUserData = async (req, res)=>{
 //User Enrolled courses with lectures links
 export const userEnrolledCourses = async (req, res)=>{
     try {
-        const userId = req.auth.userId
+        const userId = req.auth().userId
         const userData = await User.findById(userId).populate('enrolledCourses')
+
+        if(!userData){
+            return res.json({ success: false, message: 'User Not Found' })
+        }
 
         res.json({ success: true, enrolledCourses: userData.enrolledCourses })
     } catch (error) {
@@ -36,7 +43,7 @@ export const purchaseCourse = async (req, res)=>{
     try {
         const { courseId } = req.body
         const { origin } = req.headers
-        const userId = req.auth.userId
+        const userId = req.auth().userId
         const userData = await User.findById(userId)
         const courseData = await Course.findById(courseId)
 
@@ -44,13 +51,13 @@ export const purchaseCourse = async (req, res)=>{
             return res.json({ success: false, message: 'Data Not Found'})
         }
 
-        const purchaseCourse = {
+        const purchaseData = {
             courseId: courseData._id,
             userId,
             amount: (courseData.coursePrice - courseData.discount * courseData.coursePrice / 100).toFixed(2),
         }
 
-        const newPurchase = await purchaseCourse.create(purchaseData)
+        const newPurchase = await Purchase.create(purchaseData)
 
         //Stripe Gateway Initialize
         const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -70,7 +77,7 @@ export const purchaseCourse = async (req, res)=>{
         }]
 
         const session = await stripeInstance.checkout.sessions.create({
-            success_url: `${origin}/loading/my-enrollments`,
+            success_url: `${origin}/loading/my-enrollment`,
             cancel_url: `${origin}/`,
             line_items: line_items,
             mode: 'payment',
@@ -90,7 +97,7 @@ export const purchaseCourse = async (req, res)=>{
 //update user course progress
 export const updateUserCourseProgress = async (req, res)=>{
     try {
-        const userId = req.auth.userId
+        const userId = req.auth().userId
         const { courseId, lectureId } = req.body
         const progressData = await CourseProgress.findOne({userId, courseId})
 
@@ -118,7 +125,7 @@ export const updateUserCourseProgress = async (req, res)=>{
 //get user course progress
 export const getUserCourseProgress = async (req, res) =>{
     try {
-        const userId = req.auth.userId
+        const userId = req.auth().userId
         const { courseId } = req.body
         const progressData = await CourseProgress.findOne({userId, courseId})
         res.json({success: true, progressData})
@@ -128,12 +135,11 @@ export const getUserCourseProgress = async (req, res) =>{
 }
 
 //add user ratings to course
-
 export const addUserRating = async (req, res)=>{
-    const userId = req.auth.userId;
+    const userId = req.auth().userId;
     const { courseId, rating } = req.body;
 
-    if(!courseId || !userId || !rating < 1 || rating > 5){
+    if(!courseId || !userId || rating < 1 || rating > 5){
         return res.json({success: false, message: 'Invalid Details' });
     }
 
@@ -145,13 +151,13 @@ export const addUserRating = async (req, res)=>{
             
         } 
         
-        const user = await User.findById(courseId);
+        const user = await User.findById(userId);
 
         if(!user || !user.enrolledCourses.includes(courseId)){
             return res.json({ success: false, message: 'User has not purchased this course.'});
         }
 
-        const existingRatingIndex = course.courseRatings.findIndex(r => r.usedId === userId)
+        const existingRatingIndex = course.courseRatings.findIndex(r => r.userId === userId)
 
         if(existingRatingIndex > -1){
             course.courseRatings[existingRatingIndex].rating = rating;

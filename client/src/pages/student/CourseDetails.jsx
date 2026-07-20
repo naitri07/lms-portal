@@ -6,6 +6,8 @@ import { assets } from '../../assets/assets'
 import humanizeDuration from 'humanize-duration'
 import Footer from '../../components/student/Footer'
 import YouTube from 'react-youtube'
+import { toast } from 'react-toastify'
+import axios from 'axios'
 
 const CourseDetails = () => {
   const { id } = useParams()
@@ -20,19 +22,63 @@ const CourseDetails = () => {
     calculateNoOfLectures,
     calculateCourseDuration,
     calculateChapterTime, 
-    currency 
+    currency,
+    backendUrl,
+    userData,
+    getToken,
   } = useContext(AppContext)
 
   const fetchCourseData = async () => {
-    const findCourse = allCourses.find(course => course._id === id)
-    setCourseData(findCourse)
+    try {
+      const {data} = await axios.get(backendUrl + '/api/course/' + id)
+
+      if(data.success){
+        setCourseData(data.courseData)
+      }else{
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error(data.message)
+    }
+  }
+
+  const enrolledCourse = async ()=>{
+    try {
+      if(!userData){
+        return toast.warn('Login to Enroll')
+      }
+      if(isAlreadyEnrolled){
+        return toast.warn('Already Enrolled')
+      }
+
+      const token = await getToken();
+
+      const {data} = await axios.post(backendUrl + '/api/user/purchase', {courseId: courseData._id},
+        {headers: {Authorization: `Bearer ${token}`}}
+      )
+
+      if(data.success){
+        const {session_url} = data
+        window.location.replace(session_url)
+      } else{
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error(error.message)
+    }
   }
 
   useEffect(() => {
-    if (allCourses.length > 0) {
-      fetchCourseData()
+    fetchCourseData()
+  },[])
+
+
+  useEffect(() => {
+    if(userData && courseData){
+      setIsAlreadyEnrolled(userData.enrolledCourses.includes(courseData._id))
     }
-  }, [allCourses, id])
+  },[userData, courseData])
+
 
   if (!courseData) return <Loading />
 
@@ -89,7 +135,7 @@ const CourseDetails = () => {
           </div>
 
           <p className='text-sm mt-2'>
-            Course by <span className='text-blue-600 underline font-medium'>{courseData.educator?.name || 'Naitri Chavan'}</span>
+            Course by <span className='text-blue-600 underline font-medium'>{courseData.educator.name}</span>
           </p>
 
           {/* Course Structure */}
@@ -199,7 +245,7 @@ const CourseDetails = () => {
             </div>
 
             {/* Enroll Button */}
-            <button className='md:mt-6 mt-4 w-full py-3 rounded bg-blue-600 text-white font-medium hover:bg-blue-700 transition'>
+            <button onClick={enrolledCourse} className='md:mt-6 mt-4 w-full py-3 rounded bg-blue-600 text-white font-medium hover:bg-blue-700 transition'>
               {isAlreadyEnrolled ? 'Already Enrolled' : 'Enroll Now'}
             </button>
 
