@@ -1,9 +1,10 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import os from "os";
 
-// ✅ Ensure uploads folder exists
-const uploadDir = 'uploads/';
+// Use the OS temp directory — writable on Vercel (/tmp) and locally
+const uploadDir = path.join(os.tmpdir(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -32,5 +33,4 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
-// ✅ Sahi export - upload ko export karo, multer ko nahi
 export default upload;
