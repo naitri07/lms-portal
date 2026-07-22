@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { assets } from '../../assets/assets'
 import { Link, useNavigate } from 'react-router-dom'
-import cogniShiftLogo from '../../assets/CogniShift-logo.jpg';
+import cogniShiftLogo from '../../assets/CogniShift-logo.png';
 import { useClerk, UserButton, useUser } from '@clerk/clerk-react'
 import { AppContext } from '../../context/AppContext';
 import axios from 'axios';
@@ -9,7 +9,7 @@ import { toast } from 'react-toastify';
 
 const Navbar = () => {
 
-  const{navigate, isEducator, backendUrl, setIsEducator, getToken} = useContext(AppContext)
+  const{navigate, isEducator, isAdmin, backendUrl, setIsEducator, getToken} = useContext(AppContext)
 
   const isCourseListPage = location.pathname.includes('/course-list');
 
@@ -48,6 +48,7 @@ const Navbar = () => {
             <>
                 <button onClick={becomeEducator}>{isEducator ? 'Educator Dashboard' : 'Become Educator'}</button>
               <Link to='/my-enrollment'>My Enrollment</Link>
+              {isAdmin && <Link to='/admin'>Admin Dashboard</Link>}
             </>
             }
 
@@ -64,6 +65,7 @@ const Navbar = () => {
             <>
                 <button onClick={becomeEducator}>{isEducator ? 'Educator Dashboard' : 'Become Educator'}</button>
               <Link to='/my-enrollment'>My Enrollment</Link>
+              {isAdmin && <Link to='/admin'>Admin Dashboard</Link>}
             </>
             }
           </div>
